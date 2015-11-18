@@ -279,7 +279,7 @@ __zfs_complete()
             fi
             ;;
         send)
-            if ! __zfs_complete_switch "d,n,P,p,R,v,i,I"
+            if ! __zfs_complete_switch "D,n,P,p,R,v,e,L,i,I"
             then
                 COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
             fi
