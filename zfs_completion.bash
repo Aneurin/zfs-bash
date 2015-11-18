@@ -120,7 +120,7 @@ __zfs_argument_chosen()
             fi
             for property in $@
             do
-                if [[ $prev == "$property" ]]
+                if [[ $prev == "$property"* ]]
                 then
                     return 0
                 fi
@@ -169,6 +169,16 @@ __zfs_complete_switch()
     fi
 }
 
+__zfs_complete_nospace()
+{
+    # Google indicates that there may still be bash versions out there that
+    # don't have compopt.
+    if type compopt &> /dev/null
+    then
+        compopt -o nospace
+    fi
+}
+
 __zfs_complete()
 {
     local cur prev cmd cmds
@@ -189,6 +199,7 @@ __zfs_complete()
             case "${prev}" in
                 -o)
                     COMPREPLY=($(compgen -W "$(__zfs_get_editable_properties)" -- "$cur"))
+                    __zfs_complete_nospace
                     ;;
                 *)
                     if ! __zfs_complete_switch "o,p"
@@ -277,17 +288,20 @@ __zfs_complete()
             case "${prev}" in
                 -o)
                     COMPREPLY=($(compgen -W "$(__zfs_get_editable_properties)" -- "$cur"))
+                    __zfs_complete_nospace
                     ;;
                 *)
                     if ! __zfs_complete_switch "o,r"
                     then
                         COMPREPLY=($(compgen -W "$(__zfs_list_datasets | awk '{print $1"@"}')" -- "$cur"))
+                        __zfs_complete_nospace
                     fi
                     ;;
             esac
             ;;
         set)
             __zfs_complete_ordered_arguments "$(__zfs_get_editable_properties)" "$(__zfs_match_explicit_snapshot) $(__zfs_list_datasets)" $cur
+            __zfs_complete_nospace
             ;;
         upgrade)
             case "${prev}" in
@@ -306,6 +320,7 @@ __zfs_complete()
             if ! __zfs_complete_switch "d,f,n,p,R,r,v"
             then
                 __zfs_complete_multiple_options "$(__zfs_match_multiple_snapshots)" $cur
+                __zfs_complete_nospace
             fi
             ;;
         *)
@@ -367,6 +382,7 @@ __zpool_complete()
             ;;
         set)
             __zfs_complete_ordered_arguments "$(__zpool_get_editable_properties)" "$(__zpool_list_pools)" $cur
+            __zfs_complete_nospace
             return 0
             ;;
         add|attach|clear|create|detach|offline|online|remove|replace)
