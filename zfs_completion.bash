@@ -51,12 +51,12 @@ __zfs_get_inheritable_properties()
 
 __zfs_list_datasets()
 {
-    $__ZFS_CMD list -H -o name -t filesystem,volume
+    $__ZFS_CMD list -H -o name -s name -t filesystem,volume
 }
 
 __zfs_list_filesystems()
 {
-    $__ZFS_CMD list -H -o name -t filesystem
+    $__ZFS_CMD list -H -o name -s name -t filesystem
 }
 
 __zfs_match_snapshot()
@@ -66,7 +66,7 @@ __zfs_match_snapshot()
     then
         $__ZFS_CMD list -H -o name -s name -t snapshot -d 1 $base_dataset
     else
-        $__ZFS_CMD list -H -o name -t filesystem,volume | awk '{print $1"@"}'
+        $__ZFS_CMD list -H -o name -s name -t filesystem,volume | awk '{print $1"@"}'
     fi
 }
 
@@ -103,7 +103,7 @@ __zfs_match_multiple_snapshots()
 
 __zfs_list_volumes()
 {
-    $__ZFS_CMD list -H -o name -t volume
+    $__ZFS_CMD list -H -o name -s name -t volume
 }
 
 __zfs_argument_chosen()
