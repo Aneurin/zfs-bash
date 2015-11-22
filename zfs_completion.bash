@@ -29,6 +29,12 @@ else
     __ZPOOL_CMD="sudo zpool"
 fi
 
+# Disable bash's built-in hostname completion, as this makes it impossible to
+# provide completions containing an @-sign, which is necessary for completing
+# snapshot names. If bash_completion is in use, this will already be disabled
+# and replaced with better completions anyway.
+shopt -u hostcomplete
+
 __zfs_get_commands()
 {
     $__ZFS_CMD 2>&1 | awk '/^\t[a-z]/ {print $1}' | cut -f1 -d '|' | uniq
@@ -183,8 +189,14 @@ __zfs_complete()
 {
     local cur prev cmd cmds
     COMPREPLY=()
-    # Don't split on colon
-    _get_comp_words_by_ref -n : -c cur -p prev -w COMP_WORDS -i COMP_CWORD
+    if type _get_comp_words_by_ref &> /dev/null
+    then
+        # Don't split on colon
+        _get_comp_words_by_ref -n : -c cur -p prev -w COMP_WORDS -i COMP_CWORD
+    else
+        cur="${COMP_WORDS[COMP_CWORD]}"
+        prev="${COMP_WORDS[COMP_CWORD-1]}"
+    fi
     cmd="${COMP_WORDS[1]}"
 
     if [[ ${prev##*/} == zfs ]]
@@ -327,7 +339,10 @@ __zfs_complete()
             COMPREPLY=($(compgen -W "$(__zfs_match_explicit_snapshot) $(__zfs_list_datasets)" -- "$cur"))
             ;;
     esac
-    __ltrim_colon_completions "$cur"
+    if type __ltrim_colon_completions &> /dev/null
+    then
+        __ltrim_colon_completions "$cur"
+    fi
     return 0
 }
 
