@@ -85,6 +85,27 @@ __zfs_match_explicit_snapshot()
     fi
 }
 
+__zfs_match_snapshot_or_bookmark()
+{
+    local base_dataset=${cur%[#@]*}
+    if [[ $base_dataset != $cur ]]
+    then
+        if [[ $cur == *@* ]]
+        then
+            $__ZFS_CMD list -H -o name -s name -t snapshot -d 1 $base_dataset
+        else
+            $__ZFS_CMD list -H -o name -s name -t bookmark -d 1 $base_dataset
+        fi
+    else
+        $__ZFS_CMD list -H -o name -s name -t filesystem,volume
+        if [[ $cur != "" ]] && $__ZFS_CMD list -H -o name -s name -t filesystem,volume $cur &> /dev/null
+        then
+            echo $cur@
+            echo $cur#
+        fi
+    fi
+}
+
 __zfs_match_multiple_snapshots()
 {
     local existing_opts=$(expr "$cur" : '\(.*\)[%,]')
@@ -103,7 +124,7 @@ __zfs_match_multiple_snapshots()
             $__ZFS_CMD list -H -o name -s name -t snapshot -d 1 $base_dataset | sed 's$.*@$'$range_start'$g'
         fi
     else
-        __zfs_match_explicit_snapshot; __zfs_list_datasets
+        __zfs_match_snapshot_or_bookmark
     fi
 }
 
@@ -120,7 +141,7 @@ __zfs_argument_chosen()
         local prev="${COMP_WORDS[$word]}"
         if [[ ${COMP_WORDS[$word-1]} != -[tos] ]]
         then
-            if [[ "$prev" == [^,]*,* ]] || [[ "$prev" == *[@:]* ]]
+            if [[ "$prev" == [^,]*,* ]] || [[ "$prev" == *[@:\#]* ]]
             then
                 return 0
             fi
@@ -207,6 +228,14 @@ __zfs_complete()
     fi
 
     case "${cmd}" in
+        bookmark)
+            if __zfs_argument_chosen
+            then
+                COMPREPLY=($(compgen -W "${prev%@*}# ${prev/@/#}" -- "$cur"))
+            else
+                COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
+            fi
+            ;;
         clone)
             case "${prev}" in
                 -o)
@@ -265,7 +294,7 @@ __zfs_complete()
                     COMPREPLY=($(compgen -W "" -- "$cur"))
                     ;;
                 -t)
-                    __zfs_complete_multiple_options "filesystem volume snapshot all" "$cur"
+                    __zfs_complete_multiple_options "filesystem volume snapshot bookmark all" "$cur"
                     ;;
                 -o)
                     __zfs_complete_multiple_options "$(__zfs_get_properties)" "$cur"
@@ -293,7 +322,17 @@ __zfs_complete()
         send)
             if ! __zfs_complete_switch "D,n,P,p,R,v,e,L,i,I"
             then
-                COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
+                if __zfs_argument_chosen
+                then
+                    COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
+                else
+                    if [[ $prev == -*i* ]]
+                    then
+                        COMPREPLY=($(compgen -W "$(__zfs_match_snapshot_or_bookmark)" -- "$cur"))
+                    else
+                        COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
+                    fi
+                fi
             fi
             ;;
         snapshot)
