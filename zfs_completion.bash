@@ -57,7 +57,7 @@ __zfs_get_inheritable_properties()
 
 __zfs_list_datasets()
 {
-    $__ZFS_CMD list -H -o name -s name -t filesystem,volume
+    $__ZFS_CMD list -H -o name -s name -t filesystem,volume "$@"
 }
 
 __zfs_list_filesystems()
@@ -72,16 +72,36 @@ __zfs_match_snapshot()
     then
         $__ZFS_CMD list -H -o name -s name -t snapshot -d 1 $base_dataset
     else
-        $__ZFS_CMD list -H -o name -s name -t filesystem,volume | awk '{print $1"@"}'
-    fi
-}
-
-__zfs_match_explicit_snapshot()
-{
-    local base_dataset=${cur%@*}
-    if [[ $base_dataset != $cur ]]
-    then
-        $__ZFS_CMD list -H -o name -s name -t snapshot -d 1 $base_dataset
+        if [[ $cur != "" ]] && __zfs_list_datasets $cur &> /dev/null
+        then
+            $__ZFS_CMD list -H -o name -s name -t filesystem -r $cur | tail -n +2
+            # We output the base dataset name even though we might be
+            # completing a command that can only take a snapshot, because it
+            # prevents bash from considering the completion finished when it
+            # ends in the bare @.
+            echo $cur
+            echo $cur@
+        else
+            local datasets=$(__zfs_list_datasets)
+            # As above
+            echo $datasets
+            if [[ "$cur" == */ ]]
+            then
+                # If the current command ends with a slash, then the only way
+                # it can be completed with a single tab press (ie. in this pass)
+                # is if it has exactly one child, so that's the only time we
+                # need to offer a suggestion with an @ appended.
+                local num_children
+                # This is actually off by one as zfs list includes the named
+                # dataset in addition to its children
+                num_children=$(__zfs_list_datasets -d 1 ${cur%/} 2> /dev/null | wc -l)
+                if [[ $num_children != 2 ]]
+                then
+                    return 0
+                fi
+            fi
+            echo "$datasets" | awk '{print $1"@"}'
+        fi
     fi
 }
 
@@ -274,7 +294,7 @@ __zfs_complete()
                     then
                         if __zfs_argument_chosen $(__zfs_get_properties)
                         then
-                            COMPREPLY=($(compgen -W "$(__zfs_match_explicit_snapshot) $(__zfs_list_datasets)" -- "$cur"))
+                            COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
                         else
                             __zfs_complete_multiple_options "$(__zfs_get_properties)" "$cur"
                         fi
@@ -285,7 +305,7 @@ __zfs_complete()
         inherit)
             if ! __zfs_complete_switch "r"
             then
-                __zfs_complete_ordered_arguments "$(__zfs_get_inheritable_properties)" "$(__zfs_match_explicit_snapshot) $(__zfs_list_datasets)" $cur
+                __zfs_complete_ordered_arguments "$(__zfs_get_inheritable_properties)" "$(__zfs_match_snapshot)" $cur
             fi
             ;;
         list)
@@ -305,7 +325,7 @@ __zfs_complete()
                 *)
                     if ! __zfs_complete_switch "H,r,d,o,t,s,S"
                     then
-                        COMPREPLY=($(compgen -W "$(__zfs_match_explicit_snapshot) $(__zfs_list_datasets)" -- "$cur"))
+                        COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
                     fi
                     ;;
             esac
@@ -344,14 +364,14 @@ __zfs_complete()
                 *)
                     if ! __zfs_complete_switch "o,r"
                     then
-                        COMPREPLY=($(compgen -W "$(__zfs_list_datasets | awk '{print $1"@"}')" -- "$cur"))
+                        COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
                         __zfs_complete_nospace
                     fi
                     ;;
             esac
             ;;
         set)
-            __zfs_complete_ordered_arguments "$(__zfs_get_editable_properties)" "$(__zfs_match_explicit_snapshot) $(__zfs_list_datasets)" $cur
+            __zfs_complete_ordered_arguments "$(__zfs_get_editable_properties)" "$(__zfs_match_snapshot)" $cur
             __zfs_complete_nospace
             ;;
         upgrade)
@@ -375,7 +395,7 @@ __zfs_complete()
             fi
             ;;
         *)
-            COMPREPLY=($(compgen -W "$(__zfs_match_explicit_snapshot) $(__zfs_list_datasets)" -- "$cur"))
+            COMPREPLY=($(compgen -W "$(__zfs_match_snapshot)" -- "$cur"))
             ;;
     esac
     if type __ltrim_colon_completions &> /dev/null
